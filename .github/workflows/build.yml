@@ -43,8 +43,12 @@ jobs:
       run: |
         Write-Host "Building with SDK version: $env:SDK_VERSION"
         
+        # Set INCLUDE environment variable for compiler
+        $wdkInclude = "C:\Program Files (x86)\Windows Kits\10\Include\$env:SDK_VERSION"
+        $env:INCLUDE = "$wdkInclude\km;$wdkInclude\shared;$wdkInclude\um;$env:INCLUDE"
+        Write-Host "INCLUDE path set: $env:INCLUDE"
+        
         # Build with detected SDK version
-        # IncludePath is configured in vcxproj file
         & $env:MSBUILD_PATH ObRegisterCallbacks.vcxproj `
           /p:Configuration=Release `
           /p:Platform=x64 `
