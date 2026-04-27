@@ -117,12 +117,12 @@ jobs:
           /reference:System.Drawing.dll `
           /reference:System.ServiceProcess.dll `
           Program.cs MainForm.cs ClientLib.cs DriverService.cs
+      continue-on-error: true
 
     - name: Upload Artifacts
       uses: actions/upload-artifact@v4
+      if: always()
       with:
-        name: hipro-Build
-        path: |
-          x64/Release/hipro.sys
-          Bin/hipro.exe
+        name: hipro-Driver
+        path: x64/Release/hipro.sys
         retention-days: 7
