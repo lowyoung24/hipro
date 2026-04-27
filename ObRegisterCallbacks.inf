@@ -1,0 +1,62 @@
+;
+; hipro.inf
+;
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = System ; TODO: specify appropriate Class
+ClassGuid   = {4d36e97d-e325-11ce-bfc1-08002be10318} ; TODO: specify appropriate ClassGuid
+Provider    = %ManufacturerName%
+CatalogFile = hipro.cat
+DriverVer   = ; TODO: set DriverVer in stampinf property pages
+PnpLockdown = 1
+
+[DestinationDirs]
+DefaultDestDir = 13
+
+[SourceDisksNames]
+1 = %DiskName%,,,""
+
+[SourceDisksFiles]
+hipro.sys = 1,,
+
+;*****************************************
+; Install Section
+;*****************************************
+
+[Manufacturer]
+%ManufacturerName% = Standard,NT$ARCH$.10.0...16299 ; %13% support introduced in build 16299
+
+[Standard.NT$ARCH$.10.0...16299]
+%hipro.DeviceDesc% = KmdfKernelCheat_Device, Root\hipro ; TODO: edit hw-id
+
+[KmdfKernelCheat_Device.NT]
+CopyFiles = File_Copy
+
+[File_Copy]
+hipro.sys
+
+;-------------- Service installation
+[KmdfKernelCheat_Device.NT.Services]
+AddService = hipro,%SPSVCINST_ASSOCSERVICE%, KmdfKernelCheat_Service_Inst
+
+; -------------- hipro driver install sections
+[KmdfKernelCheat_Service_Inst]
+DisplayName    = %hipro.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\hipro.sys
+
+[KmdfKernelCheat_Device.NT.Wdf]
+KmdfService = hipro, KmdfKernelCheat_wdfsect
+
+[KmdfKernelCheat_wdfsect]
+KmdfLibraryVersion = $KMDFVERSION$
+
+[Strings]
+SPSVCINST_ASSOCSERVICE = 0x00000002
+ManufacturerName = "<Your manufacturer name>" ;TODO: Replace with your manufacturer name
+DiskName = "hipro Installation Disk"
+hipro.DeviceDesc = "hipro Device"
+hipro.SVCDESC = "hipro Service"

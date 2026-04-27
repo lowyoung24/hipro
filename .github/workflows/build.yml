@@ -1,0 +1,55 @@
+name: Build Windows Driver
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-driver:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Setup Visual Studio
+      uses: SeanMcManus/setup-vstest@v1
+      with:
+        vs-version: '[17.0,)'
+        workload: 'Microsoft.VisualStudio.Workload.NativeDesktop Microsoft.VisualStudio.Workload.VCTools'
+
+    - name: Build Driver
+      run: |
+        msbuild ObRegisterCallbacks.vcxproj /p:Configuration=Release /p:Platform=x64 /t:Rebuild
+
+    - name: Upload Driver Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: hipro-Driver
+        path: x64/Release/hipro.sys
+        retention-days: 7
+
+    - name: Build Client
+      run: |
+        $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
+        $outputDir = "Bin"
+        New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
+        
+        & $csc /target:winexe /out:"$outputDir/HideProcessClient.exe" /platform:x64 /optimize+ /utf8output `
+          /reference:System.dll `
+          /reference:System.Core.dll `
+          /reference:System.Windows.Forms.dll `
+          /reference:System.Drawing.dll `
+          /reference:System.ServiceProcess.dll `
+          Program.cs MainForm.cs ClientLib.cs DriverService.cs
+
+    - name: Upload Client Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: HideProcessClient
+        path: Bin/HideProcessClient.exe
+        retention-days: 7
