@@ -1,0 +1,89 @@
+name: Build hipro Driver
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-driver:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install WDK
+      run: |
+        # Download WDK installer
+        $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
+        $wdkInstaller = "$env:TEMP\wdksetup.exe"
+        Write-Host "Downloading WDK..."
+        Invoke-WebRequest -Uri $wdkUrl -OutFile $wdkInstaller -UseBasicParsing
+        
+        Write-Host "Installing WDK..."
+        Start-Process -FilePath $wdkInstaller -ArgumentList "/quiet", "/norestart" -Wait
+        
+        # Wait for installation to complete
+        Start-Sleep -Seconds 30
+        
+        # Verify installation
+        $wdkPath = "C:\Program Files (x86)\Windows Kits\10\include"
+        if (Test-Path $wdkPath) {
+            Write-Host "WDK installed successfully"
+            Get-ChildItem $wdkPath -Directory | Select-Object -First 1 Name
+        } else {
+            # Try alternate path
+            $wdkPath = "C:\Program Files\Windows Kits\10\include"
+            if (Test-Path $wdkPath) {
+                Write-Host "WDK installed at alternate path"
+            } else {
+                Write-Error "WDK installation failed"
+                exit 1
+            }
+        }
+
+    - name: Find MSBuild
+      run: |
+        $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+        echo "MSBUILD_PATH=$msbuildPath" >> $env:GITHUB_ENV
+        Write-Host "MSBuild found: $msbuildPath"
+
+    - name: Build Driver
+      run: |
+        # Detect SDK version
+        $sdkPaths = @(
+            "C:\Program Files (x86)\Windows Kits\10\include",
+            "C:\Program Files\Windows Kits\10\include"
+        )
+        
+        $sdkVersion = $null
+        foreach ($sdkPath in $sdkPaths) {
+            if (Test-Path $sdkPath) {
+                $sdkVersion = (Get-ChildItem $sdkPath -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } | Sort-Object Name -Descending | Select-Object -First 1).Name
+                if ($sdkVersion) {
+                    Write-Host "Found SDK version: $sdkVersion at $sdkPath"
+                    break
+                }
+            }
+        }
+        
+        if (-not $sdkVersion) {
+            Write-Error "No SDK version found"
+            exit 1
+        }
+        
+        # Build with detected SDK version
+        Write-Host "Building driver with SDK version: $sdkVersion"
+        & $env:MSBUILD_PATH ObRegisterCallbacks.vcxproj `
+          /p:Configuration=Release `
+          /p:Platform=x64 `
+          /p:WindowsTargetPlatformVersion=$sdkVersion `
+          /p:SpectreMitigation=false `
+          /p:OutDir="$PWD\x64\Release\" `
+          /t:Rebuild
+
+    - name: Upload Driver
+      uses: actions/upload-artifact@v4
+      with:
+        name: hipro-sys
+        path: x64/Release/hipro.sys
+        retention-days: 7
