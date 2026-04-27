@@ -19,11 +19,8 @@ jobs:
 
     - name: Setup WDK
       run: |
-        # Download and install WDK
-        $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
-        $wdkInstaller = "$env:TEMP\wdksetup.exe"
-        Invoke-WebRequest -Uri $wdkUrl -OutFile $wdkInstaller
-        Start-Process -FilePath $wdkInstaller -ArgumentList "/q", "/norestart" -Wait
+        # GitHub Actions windows-latest already has WDK pre-installed
+        # Just find MSBuild and SDK version
         
         # Find MSBuild path
         $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
@@ -38,6 +35,19 @@ jobs:
         }
         echo "SDK_VERSION=$sdkVersion" >> $env:GITHUB_ENV
         Write-Host "Found SDK version: $sdkVersion"
+        
+        # Verify ntifs.h exists
+        $ntifsPath = "$sdkPath\$sdkVersion\km\ntifs.h"
+        if (Test-Path $ntifsPath) {
+            Write-Host "Found ntifs.h at: $ntifsPath"
+        } else {
+            Write-Warning "ntifs.h not found at expected location"
+            # Search for it
+            $found = Get-ChildItem "C:\Program Files (x86)\Windows Kits" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 5 | Select-Object -First 1
+            if ($found) {
+                Write-Host "Found ntifs.h at: $($found.FullName)"
+            }
+        }
 
     - name: Build Driver
       run: |
