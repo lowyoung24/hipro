@@ -1,37 +1,21 @@
-name: Build Windows Driver
+name: Build hipro
 
 on:
   push:
     branches: [ main, master ]
-  workflow_dispatch:  # 允许手动触发
+  workflow_dispatch:
 
 jobs:
-  build-driver:
+  build-client:
     runs-on: windows-latest
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    - name: Setup MSBuild
-      uses: microsoft/setup-msbuild@v1.1
-
-    - name: Setup Visual Studio
-      uses: SeanMcManus/setup-vstest@v1
-      with:
-        vs-version: '[17.0,)'
-        workload: 'Microsoft.VisualStudio.Workload.NativeDesktop Microsoft.VisualStudio.Workload.VCTools'
-
-    - name: Build Driver
+    - name: Setup .NET Framework
       run: |
-        msbuild ObRegisterCallbacks.vcxproj /p:Configuration=Release /p:Platform=x64 /t:Rebuild
-
-    - name: Upload Driver Artifact
-      uses: actions/upload-artifact@v4
-      with:
-        name: hipro-Driver
-        path: x64/Release/hipro.sys
-        retention-days: 7
+        choco install netfx-4.8-devpack -y
 
     - name: Build Client
       run: |
