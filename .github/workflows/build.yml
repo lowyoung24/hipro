@@ -17,55 +17,93 @@ jobs:
       run: |
         choco install netfx-4.8-devpack -y
 
-    - name: Setup WDK
+    - name: Find WDK
       run: |
-        # GitHub Actions windows-latest already has WDK pre-installed
-        # Just find MSBuild and SDK version
+        Write-Host "Searching entire C: drive for ntifs.h..."
         
-        # Find MSBuild path
-        $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
-        echo "MSBUILD_PATH=$msbuildPath" >> $env:GITHUB_ENV
+        # Search Program Files
+        $ntifs = Get-ChildItem "C:\Program Files" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
         
-        # Find installed Windows SDK version
-        $sdkPath = "C:\Program Files (x86)\Windows Kits\10\Include"
-        $sdkVersion = (Get-ChildItem $sdkPath -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } | Sort-Object Name -Descending | Select-Object -First 1).Name
-        if (-not $sdkVersion) {
-            Write-Error "No Windows SDK found"
-            exit 1
+        if (-not $ntifs) {
+            # Try Program Files (x86)
+            $ntifs = Get-ChildItem "C:\Program Files (x86)" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
         }
-        echo "SDK_VERSION=$sdkVersion" >> $env:GITHUB_ENV
-        Write-Host "Found SDK version: $sdkVersion"
         
-        # Verify ntifs.h exists
-        $ntifsPath = "$sdkPath\$sdkVersion\km\ntifs.h"
-        if (Test-Path $ntifsPath) {
-            Write-Host "Found ntifs.h at: $ntifsPath"
+        if ($ntifs) {
+            Write-Host "SUCCESS! Found ntifs.h at: $($ntifs.FullName)"
+            $kmDir = $ntifs.Directory.FullName
+            $sdkDir = $ntifs.Directory.Parent.FullName
+            $kitsDir = $ntifs.Directory.Parent.Parent.FullName
+            $wdkVersion = $ntifs.Directory.Parent.Name
+            
+            Write-Host "WDK Version: $wdkVersion"
+            Write-Host "Kits Dir: $kitsDir"
+            
+            echo "WDK_VERSION=$wdkVersion" >> $env:GITHUB_ENV
+            echo "WDK_KM_PATH=$kmDir" >> $env:GITHUB_ENV
+            echo "WDK_SHARED_PATH=$sdkDir\shared" >> $env:GITHUB_ENV
+            echo "WDK_UM_PATH=$sdkDir\um" >> $env:GITHUB_ENV
+            echo "WDK_KITS_PATH=$kitsDir" >> $env:GITHUB_ENV
         } else {
-            Write-Warning "ntifs.h not found at expected location"
-            # Search for it
-            $found = Get-ChildItem "C:\Program Files (x86)\Windows Kits" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 5 | Select-Object -First 1
-            if ($found) {
-                Write-Host "Found ntifs.h at: $($found.FullName)"
+            Write-Host "ntifs.h not found, installing WDK..."
+            
+            # Install WDK
+            winget install --id Microsoft.WindowsWDK.10.0 -e --accept-source-agreements --accept-package-agreements --silent
+            
+            # Wait
+            Write-Host "Waiting for installation (2 minutes)..."
+            Start-Sleep -Seconds 120
+            
+            # Refresh
+            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+            
+            # Search again
+            $ntifs = Get-ChildItem "C:\Program Files" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
+            
+            if (-not $ntifs) {
+                $ntifs = Get-ChildItem "C:\Program Files (x86)" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
+            }
+            
+            if ($ntifs) {
+                Write-Host "SUCCESS after install! Found at: $($ntifs.FullName)"
+                $kmDir = $ntifs.Directory.FullName
+                $sdkDir = $ntifs.Directory.Parent.FullName
+                $kitsDir = $ntifs.Directory.Parent.Parent.FullName
+                $wdkVersion = $ntifs.Directory.Parent.Name
+                
+                echo "WDK_VERSION=$wdkVersion" >> $env:GITHUB_ENV
+                echo "WDK_KM_PATH=$kmDir" >> $env:GITHUB_ENV
+                echo "WDK_SHARED_PATH=$sdkDir\shared" >> $env:GITHUB_ENV
+                echo "WDK_UM_PATH=$sdkDir\um" >> $env:GITHUB_ENV
+                echo "WDK_KITS_PATH=$kitsDir" >> $env:GITHUB_ENV
+            } else {
+                Write-Error "Failed to find or install WDK"
+                exit 1
             }
         }
 
     - name: Build Driver
       run: |
-        Write-Host "Building with SDK version: $env:SDK_VERSION"
+        Write-Host "=== Build Driver ==="
+        Write-Host "WDK Version: $env:WDK_VERSION"
+        Write-Host "KM Path: $env:WDK_KM_PATH"
         
-        # Set INCLUDE environment variable for compiler
-        $wdkInclude = "C:\Program Files (x86)\Windows Kits\10\Include\$env:SDK_VERSION"
-        $env:INCLUDE = "$wdkInclude\km;$wdkInclude\shared;$wdkInclude\um;$env:INCLUDE"
-        Write-Host "INCLUDE path set: $env:INCLUDE"
+        # Find MSBuild
+        $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
         
-        # Build with detected SDK version
-        & $env:MSBUILD_PATH ObRegisterCallbacks.vcxproj `
+        # Set INCLUDE
+        $env:INCLUDE = "$env:WDK_KM_PATH;$env:WDK_SHARED_PATH;$env:WDK_UM_PATH;$env:INCLUDE"
+        Write-Host "INCLUDE=$env:INCLUDE"
+        
+        # Build
+        & $msbuildPath ObRegisterCallbacks.vcxproj `
           /p:Configuration=Release `
           /p:Platform=x64 `
-          /p:WindowsTargetPlatformVersion=$env:SDK_VERSION `
+          /p:WindowsTargetPlatformVersion=$env:WDK_VERSION `
           /p:SpectreMitigation=false `
           /p:OutDir="$PWD\x64\Release\" `
-          /t:Rebuild
+          /t:Rebuild `
+          /v:minimal
 
     - name: Build Client
       run: |
