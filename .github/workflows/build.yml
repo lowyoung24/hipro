@@ -93,18 +93,14 @@ jobs:
         # Find MSBuild
         $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
         
-        # Set INCLUDE
-        $env:INCLUDE = "$env:WDK_KM_PATH;$env:WDK_SHARED_PATH;$env:WDK_UM_PATH;$env:INCLUDE"
-        Write-Host "INCLUDE=$env:INCLUDE"
-        
-        # Build - use SDK_VERSION for WindowsTargetPlatformVersion
+        # Build with explicit IncludePath parameter
         & $msbuildPath ObRegisterCallbacks.vcxproj `
           /p:Configuration=Release `
           /p:Platform=x64 `
           /p:WindowsTargetPlatformVersion=$env:SDK_VERSION `
           /p:SpectreMitigation=false `
           /p:OutDir="$PWD\x64\Release\" `
-          /t:Rebuild `
+          '/p:IncludePath='"$env:WDK_KM_PATH;$env:WDK_SHARED_PATH;$env:WDK_UM_PATH"' `\n          /t:Rebuild `
           /v:minimal
 
     - name: Build Client
