@@ -100,7 +100,8 @@ jobs:
           /p:WindowsTargetPlatformVersion=$env:SDK_VERSION `
           /p:SpectreMitigation=false `
           /p:OutDir="$PWD\x64\Release\" `
-          '/p:IncludePath='"$env:WDK_KM_PATH;$env:WDK_SHARED_PATH;$env:WDK_UM_PATH"' `\n          /t:Rebuild `
+          "/p:IncludePath=$env:WDK_KM_PATH;$env:WDK_SHARED_PATH;$env:WDK_UM_PATH" `
+          /t:Rebuild `
           /v:minimal
 
     - name: Build Client
