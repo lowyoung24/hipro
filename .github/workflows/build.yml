@@ -64,10 +64,29 @@ jobs:
             }
             exit 1
         }
+        
+        # Find installed Windows SDK version
+        Write-Host "=== Finding SDK Version ==="
+        $sdkPath = "C:\Program Files (x86)\Windows Kits\10\Include"
+        if (-not (Test-Path $sdkPath)) {
+            $sdkPath = "C:\Program Files\Windows Kits\10\Include"
+        }
+        
+        $sdkVersion = (Get-ChildItem $sdkPath -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } | Sort-Object Name -Descending | Select-Object -First 1).Name
+        
+        if (-not $sdkVersion) {
+            Write-Error "No Windows SDK found"
+            exit 1
+        }
+        
+        echo "SDK_VERSION=$sdkVersion" >> $env:GITHUB_ENV
+        Write-Host "SDK Version: $sdkVersion"
+        Write-Host "WDK Version: $wdkVersion (for include paths only)"
 
     - name: Build Driver
       run: |
         Write-Host "=== Building Driver ==="
+        Write-Host "SDK Version: $env:SDK_VERSION"
         Write-Host "WDK Version: $env:WDK_VERSION"
         Write-Host "KM Path: $env:WDK_KM_PATH"
         
@@ -78,11 +97,11 @@ jobs:
         $env:INCLUDE = "$env:WDK_KM_PATH;$env:WDK_SHARED_PATH;$env:WDK_UM_PATH;$env:INCLUDE"
         Write-Host "INCLUDE=$env:INCLUDE"
         
-        # Build
+        # Build - use SDK_VERSION for WindowsTargetPlatformVersion
         & $msbuildPath ObRegisterCallbacks.vcxproj `
           /p:Configuration=Release `
           /p:Platform=x64 `
-          /p:WindowsTargetPlatformVersion=$env:WDK_VERSION `
+          /p:WindowsTargetPlatformVersion=$env:SDK_VERSION `
           /p:SpectreMitigation=false `
           /p:OutDir="$PWD\x64\Release\" `
           /t:Rebuild `
