@@ -27,7 +27,7 @@ jobs:
         msbuild ObRegisterCallbacks.vcxproj /p:Configuration=Release /p:Platform=x64 /t:Rebuild
 
     - name: Upload Driver Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: hipro-Driver
         path: x64/Release/hipro.sys
@@ -39,7 +39,7 @@ jobs:
         $outputDir = "Bin"
         New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
         
-        & $csc /target:winexe /out:"$outputDir/HideProcessClient.exe" /platform:x64 /optimize+ /utf8output `
+        & $csc /target:winexe /out:"$outputDir/hipro.exe" /platform:x64 /optimize+ /utf8output `
           /reference:System.dll `
           /reference:System.Core.dll `
           /reference:System.Windows.Forms.dll `
@@ -48,8 +48,8 @@ jobs:
           Program.cs MainForm.cs ClientLib.cs DriverService.cs
 
     - name: Upload Client Artifact
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
-        name: HideProcessClient
-        path: Bin/HideProcessClient.exe
+        name: hipro-Client
+        path: Bin/hipro.exe
         retention-days: 7
