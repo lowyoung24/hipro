@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-client:
+  build:
     runs-on: windows-latest
     
     steps:
@@ -16,6 +16,22 @@ jobs:
     - name: Setup .NET Framework
       run: |
         choco install netfx-4.8-devpack -y
+
+    - name: Setup WDK
+      run: |
+        # Download and install WDK
+        $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
+        $wdkInstaller = "$env:TEMP\wdksetup.exe"
+        Invoke-WebRequest -Uri $wdkUrl -OutFile $wdkInstaller
+        Start-Process -FilePath $wdkInstaller -ArgumentList "/q", "/norestart" -Wait
+        
+        # Find MSBuild path
+        $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+        echo "MSBUILD_PATH=$msbuildPath" >> $env:GITHUB_ENV
+
+    - name: Build Driver
+      run: |
+        & $env:MSBUILD_PATH ObRegisterCallbacks.vcxproj /p:Configuration=Release /p:Platform=x64 /t:Rebuild
 
     - name: Build Client
       run: |
@@ -31,9 +47,11 @@ jobs:
           /reference:System.ServiceProcess.dll `
           Program.cs MainForm.cs ClientLib.cs DriverService.cs
 
-    - name: Upload Client Artifact
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: hipro-Client
-        path: Bin/hipro.exe
+        name: hipro-Build
+        path: |
+          x64/Release/hipro.sys
+          Bin/hipro.exe
         retention-days: 7
