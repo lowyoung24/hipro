@@ -43,17 +43,17 @@ jobs:
       run: |
         Write-Host "Building with SDK version: $env:SDK_VERSION"
         
-        # Set include paths for WDK headers
-        $includePath = "C:\Program Files (x86)\Windows Kits\10\Include\$env:SDK_VERSION"
-        
         # Build with detected SDK version and explicit include paths
+        # Use environment variable to avoid PowerShell parsing issues
+        $env:INCLUDE_PATH = "C:\Program Files (x86)\Windows Kits\10\Include\$env:SDK_VERSION\km;C:\Program Files (x86)\Windows Kits\10\Include\$env:SDK_VERSION\shared;C:\Program Files (x86)\Windows Kits\10\Include\$env:SDK_VERSION\um"
+        
         & $env:MSBUILD_PATH ObRegisterCallbacks.vcxproj `
           /p:Configuration=Release `
           /p:Platform=x64 `
           /p:WindowsTargetPlatformVersion=$env:SDK_VERSION `
           /p:SpectreMitigation=false `
           /p:OutDir="$PWD\x64\Release\" `
-          /p:IncludePath="$includePath\km;$includePath\shared;$includePath\um" `
+          /p:IncludePath="$env:INCLUDE_PATH" `
           /t:Rebuild
 
     - name: Build Client
