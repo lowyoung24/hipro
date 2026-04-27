@@ -17,74 +17,57 @@ jobs:
       run: |
         choco install netfx-4.8-devpack -y
 
-    - name: Find WDK
+    - name: Install WDK
       run: |
-        Write-Host "Searching entire C: drive for ntifs.h..."
+        Write-Host "=== Installing WDK ==="
         
-        # Search Program Files
-        $ntifs = Get-ChildItem "C:\Program Files" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
+        # Download WDK installer from Microsoft
+        $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
+        $installer = "$env:TEMP\wdksetup.exe"
         
-        if (-not $ntifs) {
-            # Try Program Files (x86)
-            $ntifs = Get-ChildItem "C:\Program Files (x86)" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
-        }
+        Write-Host "Downloading WDK installer..."
+        Invoke-WebRequest -Uri $wdkUrl -OutFile $installer -UseBasicParsing
+        Write-Host "Download complete: $((Get-Item $installer).Length / 1MB) MB"
+        
+        # Install WDK
+        Write-Host "Installing WDK (this will take 5-10 minutes)..."
+        Start-Process -FilePath $installer -ArgumentList "/quiet", "/norestart" -Wait -NoNewWindow
+        
+        # Wait for installation to finalize
+        Write-Host "Waiting for installation to complete..."
+        Start-Sleep -Seconds 60
+        
+        # Refresh environment
+        $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+        
+        # Find ntifs.h
+        Write-Host "Searching for ntifs.h..."
+        $ntifs = Get-ChildItem "C:\Program Files (x86)\Windows Kits","C:\Program Files\Windows Kits" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
         
         if ($ntifs) {
             Write-Host "SUCCESS! Found ntifs.h at: $($ntifs.FullName)"
             $kmDir = $ntifs.Directory.FullName
             $sdkDir = $ntifs.Directory.Parent.FullName
-            $kitsDir = $ntifs.Directory.Parent.Parent.FullName
             $wdkVersion = $ntifs.Directory.Parent.Name
             
             Write-Host "WDK Version: $wdkVersion"
-            Write-Host "Kits Dir: $kitsDir"
             
             echo "WDK_VERSION=$wdkVersion" >> $env:GITHUB_ENV
             echo "WDK_KM_PATH=$kmDir" >> $env:GITHUB_ENV
             echo "WDK_SHARED_PATH=$sdkDir\shared" >> $env:GITHUB_ENV
             echo "WDK_UM_PATH=$sdkDir\um" >> $env:GITHUB_ENV
-            echo "WDK_KITS_PATH=$kitsDir" >> $env:GITHUB_ENV
         } else {
-            Write-Host "ntifs.h not found, installing WDK..."
-            
-            # Install WDK
-            winget install --id Microsoft.WindowsWDK.10.0 -e --accept-source-agreements --accept-package-agreements --silent
-            
-            # Wait
-            Write-Host "Waiting for installation (2 minutes)..."
-            Start-Sleep -Seconds 120
-            
-            # Refresh
-            $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
-            
-            # Search again
-            $ntifs = Get-ChildItem "C:\Program Files" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
-            
-            if (-not $ntifs) {
-                $ntifs = Get-ChildItem "C:\Program Files (x86)" -Recurse -Filter "ntifs.h" -ErrorAction SilentlyContinue -Depth 8 | Select-Object -First 1
+            Write-Error "CRITICAL: ntifs.h not found after installation!"
+            Write-Host "Checking Windows Kits directory:"
+            Get-ChildItem "C:\Program Files (x86)\Windows Kits","C:\Program Files\Windows Kits" -ErrorAction SilentlyContinue | ForEach-Object {
+                Write-Host "  - $($_.FullName)"
             }
-            
-            if ($ntifs) {
-                Write-Host "SUCCESS after install! Found at: $($ntifs.FullName)"
-                $kmDir = $ntifs.Directory.FullName
-                $sdkDir = $ntifs.Directory.Parent.FullName
-                $kitsDir = $ntifs.Directory.Parent.Parent.FullName
-                $wdkVersion = $ntifs.Directory.Parent.Name
-                
-                echo "WDK_VERSION=$wdkVersion" >> $env:GITHUB_ENV
-                echo "WDK_KM_PATH=$kmDir" >> $env:GITHUB_ENV
-                echo "WDK_SHARED_PATH=$sdkDir\shared" >> $env:GITHUB_ENV
-                echo "WDK_UM_PATH=$sdkDir\um" >> $env:GITHUB_ENV
-                echo "WDK_KITS_PATH=$kitsDir" >> $env:GITHUB_ENV
-            } else {
-                Write-Error "Failed to find or install WDK"
-                exit 1
-            }
+            exit 1
         }
 
     - name: Build Driver
       run: |
-        Write-Host "=== Build Driver ==="
+        Write-Host "=== Building Driver ==="
         Write-Host "WDK Version: $env:WDK_VERSION"
         Write-Host "KM Path: $env:WDK_KM_PATH"
         
