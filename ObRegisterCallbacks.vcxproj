@@ -121,7 +121,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
-    <IncludePath>$(WindowsSDK_IncludePath);$(WDKContentRoot)Include\$(WindowsTargetPlatformVersion)\km;$(WDKContentRoot)Include\$(WindowsTargetPlatformVersion)\shared;$(WDKContentRoot)Include\$(WindowsTargetPlatformVersion)\um</IncludePath>
+    <IncludePath>$(KIT_SHARED_IncludePath);$(KIT_UNIONED_IncludePath);$(WindowsSDK_IncludePath)</IncludePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|ARM'">
     <DebuggerFlavor>DbgengKernelDebugger</DebuggerFlavor>
