@@ -77,12 +77,18 @@ jobs:
         
         # Build with explicit include paths
         Write-Host "Building driver..."
+        
+        # Set environment variable for WDK include path
+        $env:INCLUDE = "$includePath\$sdkVersion\km;$includePath\$sdkVersion\shared;$includePath\$sdkVersion\um;$env:INCLUDE"
+        Write-Host "INCLUDE path set to: $includePath\$sdkVersion\km"
+        
         & $env:MSBUILD_PATH ObRegisterCallbacks.vcxproj `
           /p:Configuration=Release `
           /p:Platform=x64 `
           /p:WindowsTargetPlatformVersion=$sdkVersion `
           /p:SpectreMitigation=false `
           /p:OutDir="$PWD\x64\Release\" `
+          /p:IncludePath="$includePath\$sdkVersion\km;$includePath\$sdkVersion\shared;$includePath\$sdkVersion\um" `
           /t:Rebuild `
           /v:normal
 
