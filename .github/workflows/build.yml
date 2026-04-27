@@ -29,17 +29,21 @@ jobs:
         $msbuildPath = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
         echo "MSBUILD_PATH=$msbuildPath" >> $env:GITHUB_ENV
         
-        # Setup WDK environment variables
-        $wdkKitPath = "C:\Program Files (x86)\Windows Kits\10"
-        echo "WDK_KIT_PATH=$wdkKitPath" >> $env:GITHUB_ENV
+        # Find installed Windows SDK version
+        $sdkPath = "C:\Program Files (x86)\Windows Kits\10\Include"
+        $sdkVersion = (Get-ChildItem $sdkPath -Directory | Sort-Object Name -Descending | Select-Object -First 1).Name
+        echo "SDK_VERSION=$sdkVersion" >> $env:GITHUB_ENV
+        Write-Host "Found SDK version: $sdkVersion"
 
     - name: Build Driver
       run: |
-        # Build with WDK settings
+        Write-Host "Building with SDK version: $env:SDK_VERSION"
+        
+        # Build with detected SDK version
         & $env:MSBUILD_PATH ObRegisterCallbacks.vcxproj `
           /p:Configuration=Release `
           /p:Platform=x64 `
-          /p:WindowsTargetPlatformVersion=10.0.22000.0 `
+          /p:WindowsTargetPlatformVersion=$env:SDK_VERSION `
           /p:OutDir="$PWD\x64\Release\" `
           /t:Rebuild
 
