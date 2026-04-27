@@ -31,7 +31,11 @@ jobs:
         
         # Find installed Windows SDK version
         $sdkPath = "C:\Program Files (x86)\Windows Kits\10\Include"
-        $sdkVersion = (Get-ChildItem $sdkPath -Directory | Sort-Object Name -Descending | Select-Object -First 1).Name
+        $sdkVersion = (Get-ChildItem $sdkPath -Directory | Where-Object { $_.Name -match '^\d+\.\d+\.\d+\.\d+$' } | Sort-Object Name -Descending | Select-Object -First 1).Name
+        if (-not $sdkVersion) {
+            Write-Error "No Windows SDK found"
+            exit 1
+        }
         echo "SDK_VERSION=$sdkVersion" >> $env:GITHUB_ENV
         Write-Host "Found SDK version: $sdkVersion"
 
